@@ -21,7 +21,7 @@ payload_button() {
     status="button"
   fi
 
-  # Remove extensions and truncate the label to 8 characters
+  # Remove extensions and truncate the label to 10 characters
   label="${label%.*}"
   if [ ${#label} -gt 10 ]; then
     label=$(echo "$label" | cut -c 1-10)..
@@ -89,16 +89,21 @@ main() {
   for category_info in \
     "JAR $jar_path jar" \
     "LUA $lua_path lua" \
-    "ELF $elf_path elf"; do
+    "ELF $elf_path bin elf"; do
 
     # Extract category info
     set -- $category_info
     category_name="$1"
     category_path="$2"
-    category_extension="$3"
+    shift 2
+    extensions="$@"
 
-    # Get payloads and render them
-    payloads=$(get_filenames_from_directory "$category_path" "$category_extension")
+    # Collect all payloads for the category
+    payloads=""
+    for ext in $extensions; do
+      payloads="$payloads $(get_filenames_from_directory "$category_path" "$ext")"
+    done
+
     render_category "$category_name" "$payloads" "$selected_payload"
   done
 
@@ -112,12 +117,12 @@ main() {
     case "$file_type" in
       "jar") port="$jar_port"; path="$jar_path" ;;
       "lua") port="$lua_port"; path="$lua_path" ;;
-      "elf") port="$elf_port"; path="$elf_path" ;;
+      "bin"|"elf") port="$elf_port"; path="$elf_path" ;;
     esac
 
     # Send the selected_payload and capture the output
     case "$file_type" in
-      "jar"|"elf") output=$(socat FILE:"$path$selected_payload" TCP:"$ip":"$port" 2>&1) ;;
+      "jar"|"bin"|"elf") output=$(socat FILE:"$path$selected_payload" TCP:"$ip":"$port" 2>&1) ;;
       "lua") output=$(python "$path/send_lua.py" "$ip" "$port" "$path$selected_payload" 2>&1) ;;
     esac
   fi
