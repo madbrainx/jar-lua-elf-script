@@ -24,6 +24,18 @@ Before using, make sure to configure the paths and IP address in the script:
 - Update the file paths for the .jar, .lua, and .elf files to point to their correct locations on your system.
 - Copy the jar-lua-elf-script.sh script to /var/www/html/ or another location served by your lighttpd web server.
 
+Got it! Here's the revised section of your `README.md` with that clarification:
+
+## Creating a Queue File
+
+You can automate sending multiple commands by placing a `.queue` text file in the `queue_path` directory.  This file should contain lines of shell-compatible commands that will be read and executed by the script. Here's how to create a simple example.queue file with three commands:
+
+```bash
+python /home/pi/lua/send_lua.py 10.0.0.1 9026 /home/pi/lua/hello.lua
+sleep 5
+socat FILE:/home/pi/elf/hello.elf TCP:10.0.0.1:9021
+```
+
 ## Usage
 
 1. Make sure lighttpd is running and serving the script from the correct location.

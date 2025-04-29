@@ -5,6 +5,7 @@ ip="10.0.0.1"
 jar_path="/home/pi/jar/"
 lua_path="/home/pi/lua/"
 elf_path="/home/pi/elf/"
+queue_path="/home/pi/queue/"
 
 jar_port="9025"
 lua_port="9026"
@@ -89,7 +90,8 @@ main() {
   for category_info in \
     "JAR $jar_path jar" \
     "LUA $lua_path lua" \
-    "ELF $elf_path bin elf"; do
+    "ELF $elf_path bin elf" \
+    "QUEUE $queue_path queue"; do
 
     # Extract category info
     set -- $category_info
@@ -101,10 +103,17 @@ main() {
     # Collect all payloads for the category
     payloads=""
     for ext in $extensions; do
-      payloads="$payloads $(get_filenames_from_directory "$category_path" "$ext")"
+      files=$(get_filenames_from_directory "$category_path" "$ext")
+      [ -n "$files" ] && payloads="$payloads $files"
     done
 
-    render_category "$category_name" "$payloads" "$selected_payload"
+    # Trim whitespace
+    payloads=$(echo "$payloads" | xargs)
+
+    # Only render the category if payloads are found
+    if [ -n "$payloads" ]; then
+      render_category "$category_name" "$payloads" "$selected_payload"
+    fi
   done
 
   echo "</table></div>"
@@ -118,19 +127,26 @@ main() {
       "jar") port="$jar_port"; path="$jar_path" ;;
       "lua") port="$lua_port"; path="$lua_path" ;;
       "bin"|"elf") port="$elf_port"; path="$elf_path" ;;
+      "queue") path="$queue_path" ;;
     esac
 
-    # Send the selected_payload and capture the output
+    # Execute the selected payload and capture output
     case "$file_type" in
-      "jar"|"bin"|"elf") output=$(socat FILE:"$path$selected_payload" TCP:"$ip":"$port" 2>&1) ;;
-      "lua") output=$(python "$path/send_lua.py" "$ip" "$port" "$path$selected_payload" 2>&1) ;;
+      "jar"|"bin"|"elf") output=$(socat FILE:"$path/$selected_payload" TCP:"$ip":"$port" 2>&1) ;;
+      "lua") output=$(python "$path/send_lua.py" "$ip" "$port" "$path/$selected_payload" 2>&1) ;;
+      "queue")
+        while IFS= read -r line; do
+          echo "<hr><div><strong>Executing:</strong> $line</div><strong>Terminal Output:</strong><pre>"
+          eval "$line" 2>&1 | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+          echo "</pre>"
+        done < "$path/$selected_payload" ;;
     esac
   fi
 
   # Print the output
   if [ -n "$output" ]; then
-    echo "<div><h3>Terminal Output:</h3><pre>$output</pre></div>"
-  elif [ -n "$selected_payload" ]; then
+    echo "<div><strong>Terminal Output:</strong><pre>$output</pre></div>"
+  elif [ -n "$selected_payload" and "$file_type" != "queue" ]; then
     echo "<div>$selected_payload sent to $ip:$port</div>"
   fi
 
@@ -144,7 +160,7 @@ echo '<!DOCTYPE html>
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>jar-lua-elf-script</title>
+    <title>Payload Launcher</title>
     <style>
         body { font-size: 0.85em; font-family: Arial, sans-serif; }
         #function .button { background: #fffbff; }
